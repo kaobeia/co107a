@@ -9,6 +9,7 @@
  *       b otherwise
  */
 
+
 CHIP Mux {
     IN a, b, sel;
     OUT out;
