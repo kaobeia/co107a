@@ -39,5 +39,35 @@ CHIP CPU {
         pc[15];          // address of next instruction
 
     PARTS:
-    // Put your code here:
+    Not(in=instruction[15], out=Ainstruction);//instruction的第15位元可分辨其為A/C指令，A為0，C為1
+    Not(in=Ainstruction, out=Cinstruction)//C指定為A指令的相反
+
+    And(a=Cinstruction, b=instruction[5], out=ALUToA);//instruction[5]在C指令中屬於dest，控制資料儲存位置，這裡用於控制Aregister的輸入
+    Mux(a=instruction[0..15], b=ALUout, sel=ALUToA, out=Aregin);//由ALUToA控制Aregister的輸入為ALUout或instruction
+
+    Or(a=Ainstruction, b=ALUToA, out=loadA);//若輸入為A指令或ALU輸出則利用loadA使ARegister暫存輸入
+    ARegister(in=Aregin, load=loadA, out=Aregin);
+
+    Mux(a=Aout, b=inM, sel=instruction[12], out=AMout);//instruction的第12位元為comp,以此選擇以Aregister或記憶體作為ALU的輸入AMout
+
+    And(a=Cinstruction, b=instruction[4], out=loadD);//instruction[4]在C指令中屬於dest，控制資料儲存位置，這裡用於控制Dregister的暫存
+    DRegister(in=ALUout, load=loadD, out=Dout);//用load控制ALUout的暫存
+
+    ALU(x=Dout, y=AMout, zx=instruction[11], nx=instruction[10], zy=instruction[9], ny=instruction[8], f=instruction[7], no=instruction[6], out=ALUout, zr=ZRout, ng=NGout);
+    //instruction[6..11]皆為comp，控制CPU主要的運算
+
+    Or16(a=false, b=Aout, out=addressM[15]);//將Aregister輸出寫入記憶體
+    Or16(a=false, b=ALUout, out=outM[15]);//將ALUout放入記憶體
+    And(a=Cinstruction, b=instruction, out=writeM);//若為C指令則寫入記憶體
+
+    And(a=ZRout, b=instruction[0], out=jeq);//若輸出為0且控制jmp的instruction[1]為1，跳躍指令為JEQ(X = 0)
+    And16(a=NGout, b=instruction[1], out=jlt);//若輸出小於0且控制jmp的instruction[2]為1，跳躍指令為JLT(X < 0)
+    Or(a=ZRout, b=NGout, out=zorn);
+    Not(in=zorn, out=poitive);//如果不等於零也不小於零則為正數
+    And(a=positive, b=instruction[0], out=jgt);//若輸出為正且控制jmp的instruction[0]為1，跳躍指令為JGT(X > 0)
+    Or(a=jeq, b=jlt, out=jle);//若輸出小於或等於0則跳躍指令為JLE(X <= 0)
+    Or(a=jle, b=jgt, out=jmptoA);//若輸出小於等於或大於0，則跳躍指令為JMP
+    And(a=Cinstruction, b=jmptoA, out=PCload);//若為C指令，並且有JMP指令時，PC載入
+    Not(in=PCload, out=PCinc);//PC非載入時則+1
+    PC(in=Aout, load=PCload, inc=PCinc, reset=reset, out=pc[15]);//主要以reset/load/inc的問似處理Aregiter之輸出
 }
